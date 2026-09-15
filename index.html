@@ -179,6 +179,7 @@
 </style>
 </head>
 <body>
+    <div id="app" hidden>
 <div class="page">
 
   <!-- ================= HEADER ================= -->
@@ -384,5 +385,55 @@
   </footer>
 
 </div>
+      </div>
+
+  <!-- замок -->
+  <div id="lock-overlay">...</div>
+
+  <script>
+  (function(){
+    const PASS_HASH = "a42fac5265cae554a64a044e6932284470dd909609607a1e97704288408564e4";
+    const app = document.getElementById('app');
+    const overlay = document.getElementById('lock-overlay');
+    const form = document.getElementById('lock-form');
+    const input = document.getElementById('lock-input');
+    const err = document.getElementById('lock-err');
+
+    async function sha256(s){
+      const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
+      return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('');
+    }
+
+    function unlock(){
+      app.hidden = false;
+      overlay.remove();
+      document.removeEventListener('keydown', blockEsc, true);
+    }
+    function blockEsc(e){ if(e.key==='Escape'){ e.preventDefault(); e.stopPropagation(); } }
+    document.addEventListener('keydown', blockEsc, true);
+
+    const mo = new MutationObserver(()=>{
+      if(!document.body.contains(overlay)) document.body.appendChild(overlay);
+      if(app.hidden === false && sessionStorage.getItem('rtt_unlocked')!=='1') app.hidden = true;
+    });
+    mo.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['hidden']});
+
+    form.addEventListener('submit', async e=>{
+      e.preventDefault();
+      err.textContent = '';
+      const h = await sha256(input.value);
+      if(h === PASS_HASH){
+        sessionStorage.setItem('rtt_unlocked','1');
+        mo.disconnect();
+        unlock();
+      } else {
+        err.textContent = 'Неверный пароль.';
+        input.value=''; input.focus();
+      }
+    });
+
+    if(sessionStorage.getItem('rtt_unlocked')==='1') unlock();
+  })();
+  </script>
 </body>
 </html>
