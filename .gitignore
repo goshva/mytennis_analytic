@@ -12,3 +12,5 @@ sqlite/sync.log
 
 # Claude/local files
 .claude/
+*.zip
+*.db
