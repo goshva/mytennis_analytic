@@ -449,47 +449,75 @@
 
   <script>
   (function(){
+    // SHA-256 от пароля. Текущий пароль: RTT-owner-2026
+    // Проверить/сменить хеш: https://emn178.github.io/online-tools/sha256.html (или локально)
     const PASS_HASH = "a42fac5265cae554a64a044e6932284470dd909609607a1e97704288408564e4";
-    const app = document.getElementById('app');
+
+    const app     = document.getElementById('app');
     const overlay = document.getElementById('lock-overlay');
-    const form = document.getElementById('lock-form');
-    const input = document.getElementById('lock-input');
-    const err = document.getElementById('lock-err');
+    const form    = document.getElementById('lock-form');
+    const input   = document.getElementById('lock-input');
+    const err     = document.getElementById('lock-err');
+
+    // Защита от null — если разметка замка отсутствует, не падаем
+    if (!app || !overlay || !form || !input || !err) {
+      console.error('[lock] разметка замка не найдена; проверьте HTML');
+      if (app) app.hidden = false; // не блокируем страницу насовсем
+      return;
+    }
 
     async function sha256(s){
       const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
       return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('');
     }
 
+    let observer;
+
     function unlock(){
       app.hidden = false;
-      overlay.remove();
+      if (observer) observer.disconnect();
+      if (overlay.parentNode) overlay.remove();
       document.removeEventListener('keydown', blockEsc, true);
     }
-    function blockEsc(e){ if(e.key==='Escape'){ e.preventDefault(); e.stopPropagation(); } }
+
+    function blockEsc(e){
+      if (e.key === 'Escape'){ e.preventDefault(); e.stopPropagation(); }
+    }
     document.addEventListener('keydown', blockEsc, true);
 
-    const mo = new MutationObserver(()=>{
-      if(!document.body.contains(overlay)) document.body.appendChild(overlay);
-      if(app.hidden === false && sessionStorage.getItem('rtt_unlocked')!=='1') app.hidden = true;
+    // Не дать удалить оверлей / снять hidden через дев-тулзы
+    observer = new MutationObserver(()=>{
+      if (!document.body.contains(overlay)) {
+        document.body.appendChild(overlay);
+      }
+      if (app.hidden === false && sessionStorage.getItem('rtt_unlocked') !== '1') {
+        app.hidden = true;
+      }
     });
-    mo.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['hidden']});
+    observer.observe(document.body, {
+      childList: true, subtree: true,
+      attributes: true, attributeFilter: ['hidden']
+    });
 
     form.addEventListener('submit', async e=>{
       e.preventDefault();
       err.textContent = '';
-      const h = await sha256(input.value);
-      if(h === PASS_HASH){
+      const val = input.value;
+      if (!val){ err.textContent = 'Введите пароль.'; return; }
+
+      const h = await sha256(val);
+      if (h === PASS_HASH){
         sessionStorage.setItem('rtt_unlocked','1');
-        mo.disconnect();
         unlock();
       } else {
         err.textContent = 'Неверный пароль.';
-        input.value=''; input.focus();
+        input.value = '';
+        input.focus();
       }
     });
 
-    if(sessionStorage.getItem('rtt_unlocked')==='1') unlock();
+    // Если уже разблокировано в этой сессии — открыть сразу
+    if (sessionStorage.getItem('rtt_unlocked') === '1') unlock();
   })();
   </script>
 </body>
